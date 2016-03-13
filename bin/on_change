@@ -1,0 +1,36 @@
+#!/bin/env python
+import sys
+import time
+import logging
+import subprocess
+from watchdog.observers import Observer
+from watchdog.events import PatternMatchingEventHandler
+
+COMMAND = 'scons'
+SUBCOMMAND = 'test/bin/unit_test'
+PATTERNS = ['*.cpp', '*.c', '*.h', '*.yaml', '*.hpp', '*.cxx']
+
+class on_change(PatternMatchingEventHandler):
+    def on_any_event(self, event):
+        logging.info('Rebuilding because event detected on %s' % event.src_path)
+        status = subprocess.call(COMMAND, shell=True)
+        if not status:
+            substatus = subprocess.call(SUBCOMMAND, shell=True)
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s - %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
+    path = sys.argv[1] if len(sys.argv) > 1 else '.'
+    event_handler = on_change(patterns=PATTERNS,
+                              ignore_directories=True)
+    observer = Observer()
+    observer.schedule(event_handler, path, recursive=True)
+    logging.info('Watching %s' % path)
+    observer.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
